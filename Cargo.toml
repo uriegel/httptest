@@ -1,0 +1,11 @@
+[package]
+name = "httptest"
+version = "0.1.0"
+authors = ["uriegel <uriegel@hotmail.de>"]
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1.6", features = ["full"] }
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
+warp = { version = "0.3", features = ["tls"] }
+chrono = "0.4"

@@ -1,0 +1,26 @@
+<html>
+    <head>
+        <title>Rust HTTP Test</title>
+        <meta charset="utf-8"/>
+    </head>
+
+    <body>
+        <h1>Rust HTTP Test</h1>
+        <p>
+            This is a sample page for displaying in <em>Rust HTTP Test</em>
+        </p>
+        <p>
+           <button onclick=test()>Test</button> 
+        </p>
+
+        <script>
+            const test = async () => {
+                const res = await fetch("/test")
+                console.log("Ergebnis", res)
+            }
+
+            const connection = new WebSocket('wss://localhost:8080/echo')
+            connection.onopen = () => console.log("websocket open")
+        </script>
+    </body> 
+</html>
