@@ -35,10 +35,9 @@ type Result<T> = std::result::Result<T, Rejection>;
 type Sessions = Arc<RwLock<HashMap<String, Session>>>;
 
 async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut session: Session) {
-    let (client_ws_sender, client_ws_rcv) = ws.split();
+    let (client_ws_sender, _) = ws.split();
     let (client_sender, client_rcv) = mpsc::unbounded_channel();
     let client_rcv = tokio_stream::wrappers::UnboundedReceiverStream::new(client_rcv);
-    //client_rcv.forward(client_ws_sender);
     tokio::task::spawn(client_rcv.forward(client_ws_sender).map(|result| {
         if let Err(e) = result {
             eprintln!("error sending websocket msg: {}", e);
@@ -49,20 +48,6 @@ async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut se
     sessions.write().await.insert(id.clone(), session);
 
     println!("{} connected", id);
-
-    // while let Some(result) = client_ws_rcv.next().await {
-    //     let msg = match result {
-    //         Ok(msg) => msg,
-    //         Err(e) => {
-    //             eprintln!("error receiving ws message for id: {}): {}", id.clone(), e);
-    //             break;
-    //         }
-    //     };
-    //     client_msg(&id, msg, &clients).await;
-    // }
-
-    // sessions.write().await.remove(&id);
-    // println!("{} disconnected", id);
 }
 
 async fn on_connect(ws: warp::ws::Ws, id: String, sessions: Sessions) -> Result<impl Reply> {
@@ -93,14 +78,17 @@ async fn main() {
         .map(add_headers);
 
     async fn bm_test(sessions: Sessions)->std::result::Result<impl warp::Reply, warp::Rejection> {
-        //std::thread::sleep(core::time::Duration::from_millis(25000));
-        tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
-
-        if let Some(session) = sessions.read().await.get("left").cloned() {
-            println!("Sending to left ws");
-            if let Some(sender) = &session.sender {
-                let _ = sender.send(Ok(Message::text("Guten Abend")));
-            }
+        if sessions.read().await.contains_key("left") {
+            tokio::task::spawn(async move {
+                println!("Sending to left ws");
+                if let Some(session) = sessions.read().await.get("left").cloned() {
+                    if let Some(sender) = &session.sender {
+                        std::thread::sleep(core::time::Duration::from_millis(5000));
+                        //tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
+                        let _ = sender.send(Ok(Message::text("Guten Abend")));
+                    }
+                }
+            });
         }
 
         Ok("passed".to_string())
