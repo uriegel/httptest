@@ -55,8 +55,6 @@ async fn on_connect(ws: warp::ws::Ws, id: String, sessions: Sessions) -> Result<
 #[tokio::main]
 async fn main() {
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
-    //let (tx, rx) = mpsc::unbounded_channel::<String>();
-    
     fn with_sessions(sessions: Sessions) -> impl Filter<Extract = (Sessions,), Error = Infallible> + Clone {
         warp::any().map(move || sessions.clone())
     }
