@@ -27,14 +27,14 @@ fn create_headers() -> HeaderMap {
 
 #[derive(Debug, Clone)]
 struct Session {
-    sender: Option<mpsc::UnboundedSender<std::result::Result<Message, warp::Error>>>
+    sender: mpsc::UnboundedSender<std::result::Result<Message, warp::Error>>
 }
 
 type Result<T> = std::result::Result<T, Rejection>;
 
 type Sessions = Arc<Mutex<HashMap<String, Session>>>;
 
-async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut session: Session) {
+async fn client_connection(ws: WebSocket, id: String, sessions: Sessions) {
     let (client_ws_sender, _) = ws.split();
     let (client_sender, client_rcv) = mpsc::unbounded_channel();
     let client_rcv = tokio_stream::wrappers::UnboundedReceiverStream::new(client_rcv);
@@ -44,8 +44,12 @@ async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut se
         }
     }));
 
-    session.sender = Some(client_sender);
-    sessions.lock().unwrap().insert(id.clone(), session);
+    sessions.lock().unwrap().insert(
+        id.clone(),
+        Session {
+            sender: client_sender,
+        },
+    );
 
     println!("{} connected", id);
 }
@@ -53,16 +57,9 @@ async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut se
 async fn on_connect(ws: warp::ws::Ws, id: String, sessions: Sessions) -> Result<impl Reply> {
     println!("on_connect: {}", id);
 
-    let session = sessions.lock().unwrap().insert(
-        id.clone(),
-        Session {
-            sender: None,
-        },
-    );
-    match session {
-        Some(session) => Ok(ws.on_upgrade(move |socket| client_connection(socket, id, sessions, session))),
-        None => Err(warp::reject::not_found()),
-    }
+    Ok(ws.on_upgrade(move |socket| client_connection(socket, id, sessions)))
+    //    None => Err(warp::reject::not_found()),
+    //}
 }
 
 #[tokio::main]
@@ -82,10 +79,8 @@ async fn main() {
             std::thread::sleep(core::time::Duration::from_millis(5000));
             println!("Sending to left ws");
             if let Some(session) = sessions.lock().unwrap().get("left").cloned() {
-                if let Some(sender) = &session.sender {
-                    //tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
-                    let _ = sender.send(Ok(Message::text("Guten Abend")));
-                }
+                //tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
+                let _ = session.sender.send(Ok(Message::text("Guten Abend")));
             }
         });
 
