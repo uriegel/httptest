@@ -80,11 +80,12 @@ async fn main() {
     async fn bm_test(sessions: Sessions)->std::result::Result<impl warp::Reply, warp::Rejection> {
         if sessions.read().await.contains_key("left") {
             tokio::task::spawn(async move {
+                
                 println!("Sending to left ws");
                 if let Some(session) = sessions.read().await.get("left").cloned() {
                     if let Some(sender) = &session.sender {
-                        std::thread::sleep(core::time::Duration::from_millis(5000));
-                        //tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
+                        //std::thread::sleep(core::time::Duration::from_millis(5000));
+                        tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
                         let _ = sender.send(Ok(Message::text("Guten Abend")));
                     }
                 }
