@@ -25,13 +25,8 @@ fn create_headers() -> HeaderMap {
     header_map
 }
 
-#[derive(Debug, Clone)]
-struct Session {
-    sender: mpsc::UnboundedSender<std::result::Result<Message, warp::Error>>
-}
-
 type Result<T> = std::result::Result<T, Rejection>;
-
+type Session = mpsc::UnboundedSender<std::result::Result<Message, warp::Error>>;
 type Sessions = Arc<Mutex<HashMap<String, Session>>>;
 
 async fn client_connection(ws: WebSocket, id: String, sessions: Sessions) {
@@ -44,12 +39,7 @@ async fn client_connection(ws: WebSocket, id: String, sessions: Sessions) {
         }
     }));
 
-    sessions.lock().unwrap().insert(
-        id.clone(),
-        Session {
-            sender: client_sender,
-        },
-    );
+    sessions.lock().unwrap().insert(id.clone(), client_sender);
 
     println!("{} connected", id);
 }
@@ -80,7 +70,7 @@ async fn main() {
             println!("Sending to left ws");
             if let Some(session) = sessions.lock().unwrap().get("left").cloned() {
                 //tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
-                let _ = session.sender.send(Ok(Message::text("Guten Abend")));
+                let _ = session.send(Ok(Message::text("Guten Abend")));
             }
         });
 
