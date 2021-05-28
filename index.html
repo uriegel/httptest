@@ -19,8 +19,9 @@
                 console.log("Ergebnis", res)
             }
 
-            const connection = new WebSocket('wss://localhost:8080/echo')
+            const connection = new WebSocket('wss://localhost:8080/ws/left')
             connection.onopen = () => console.log("websocket open")
+            connection.onmessage = msg => console.log("Msg left", msg)
         </script>
     </body> 
 </html>
