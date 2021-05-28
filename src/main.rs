@@ -1,6 +1,6 @@
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::{Arc, Mutex}, thread};
 use chrono::Utc;
-use tokio::{sync::{mpsc, RwLock}};
+use tokio::{sync::mpsc};
 use warp::{Filter, Rejection, Reply, fs::{
         File, dir
     }, http::HeaderValue, hyper::{Body, HeaderMap, Response}, ws::{
@@ -32,7 +32,7 @@ struct Session {
 
 type Result<T> = std::result::Result<T, Rejection>;
 
-type Sessions = Arc<RwLock<HashMap<String, Session>>>;
+type Sessions = Arc<Mutex<HashMap<String, Session>>>;
 
 async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut session: Session) {
     let (client_ws_sender, _) = ws.split();
@@ -45,7 +45,7 @@ async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut se
     }));
 
     session.sender = Some(client_sender);
-    sessions.write().await.insert(id.clone(), session);
+    sessions.lock().unwrap().insert(id.clone(), session);
 
     println!("{} connected", id);
 }
@@ -53,7 +53,7 @@ async fn client_connection(ws: WebSocket, id: String, sessions: Sessions, mut se
 async fn on_connect(ws: warp::ws::Ws, id: String, sessions: Sessions) -> Result<impl Reply> {
     println!("on_connect: {}", id);
 
-    let session = sessions.write().await.insert(
+    let session = sessions.lock().unwrap().insert(
         id.clone(),
         Session {
             sender: None,
@@ -67,7 +67,7 @@ async fn on_connect(ws: warp::ws::Ws, id: String, sessions: Sessions) -> Result<
 
 #[tokio::main]
 async fn main() {
-    let sessions: Sessions = Arc::new(RwLock::new(HashMap::new()));
+    let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
     //let (tx, rx) = mpsc::unbounded_channel::<String>();
     
     fn with_sessions(sessions: Sessions) -> impl Filter<Extract = (Sessions,), Error = Infallible> + Clone {
@@ -78,19 +78,16 @@ async fn main() {
         .map(add_headers);
 
     async fn bm_test(sessions: Sessions)->std::result::Result<impl warp::Reply, warp::Rejection> {
-        if sessions.read().await.contains_key("left") {
-            tokio::task::spawn(async move {
-                
-                println!("Sending to left ws");
-                if let Some(session) = sessions.read().await.get("left").cloned() {
-                    if let Some(sender) = &session.sender {
-                        //std::thread::sleep(core::time::Duration::from_millis(5000));
-                        tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
-                        let _ = sender.send(Ok(Message::text("Guten Abend")));
-                    }
+        thread::spawn( move|| {
+            std::thread::sleep(core::time::Duration::from_millis(5000));
+            println!("Sending to left ws");
+            if let Some(session) = sessions.lock().unwrap().get("left").cloned() {
+                if let Some(sender) = &session.sender {
+                    //tokio::time::sleep(core::time::Duration::from_millis(5000)).await;
+                    let _ = sender.send(Ok(Message::text("Guten Abend")));
                 }
-            });
-        }
+            }
+        });
 
         Ok("passed".to_string())
     }
